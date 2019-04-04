@@ -1,16 +1,16 @@
-import torndb
-import ticket
+import json
 import os
-#import random
 import tornado.escape
 import tornado.httpserver
 import tornado.ioloop
-from binascii import hexlify
-
 import tornado.options
 import tornado.web
-import json
+from binascii import hexlify
 from tornado.options import define, options
+
+import torndb
+
+import ticket
 
 define("port", default=8888, help="run on the given port", type=int)
 define("mysql_host", default="127.0.0.1:3306", help="database host")
@@ -23,14 +23,15 @@ class MyCodes:
 
     def __init__(self):
         pass
-    NotFound=404
-    OK=200
-    duplicate=303
-    Ok_but_done_before=201
-    Already_done=202
-    Wrong_pass = 100
-    Wrong_user_pass = 105
-    Wrong_token =106
+    NotFound =          404
+    OK =                200
+    duplicate =         303
+    Ok_but_done_before =201
+    Already_done=       202
+    Wrong_pass =        100
+    Wrong_user_pass =   105
+    Wrong_token =       106
+    Access_Denied=      700
 
 
 class Application(tornado.web.Application):
@@ -86,15 +87,12 @@ class Logout(BaseHandler):
         # out_put=json.dumps({})
         out_put = {
             "message": "!",
-            "code": 1,
-            "result": json.dumps({})
+            "code": 1
         }
         if my_db is None:
             out_put["message"] = "Username or Password is wrong"
             out_put["code"] = MyCodes.Wrong_user_pass
-            out_put["result"] = json.dumps({})
         else:
-            out_put["result"] = my_db
             if my_db["token"] == "0" or my_db["token"]==0:
                 out_put["message"] = "Already logged out"
                 out_put["code"] = MyCodes.Already_done
@@ -103,7 +101,6 @@ class Logout(BaseHandler):
                 self.db.execute("UPDATE users SET token='0' WHERE username LIKE %s", user_name )
                 out_put["message"] = "Logged Out Successfully"
                 out_put["code"] = MyCodes.OK
-                out_put["result"] = my_db
 
         out_put_json = json.dumps(out_put)
         self.write(out_put_json)
@@ -121,19 +118,16 @@ class SendTicket(BaseHandler):
         out_put = {
             "message": "!",
             "code": 1,
-            "result": json.dumps({}),
             "id": 0
         }
         if my_db is None:
             out_put["message"] = "Incorrect Token"
             out_put["code"] = MyCodes.Wrong_token
-            out_put["result"] = my_db
         else:
             username=my_db["username"]
             id = new_ticket.add_to_db(self.db,username)
             out_put["message"] = "Ticket Sent Successfully"
             out_put["code"] = MyCodes.OK
-            out_put["result"] = my_db
             out_put["id"] = id
         out_put_json = json.dumps(out_put)
         self.write(out_put_json)
@@ -147,27 +141,85 @@ class GetTicketcli(BaseHandler):
             out_put = {}
             out_put["message"] = "Incorrect Token"
             out_put["code"] = MyCodes.Wrong_token
-            out_put["result"] = my_db
-            out_put["id"] = 0
             self.write(json.dumps(out_put))
         else:
             username = my_db["username"]
-            listOfTickets=ticket.Ticket.getAll(self.db,username)
+            listOfTickets=ticket.Ticket.getAll_user(self.db,username)
             self.write(listOfTickets)
+
 
 class CloseTicket(BaseHandler):
     def get(self):
-        pass
+        token = self.get_argument("token")
+        id = self.get_argument("id")
+        my_db = self.db.get("SELECT * FROM users WHERE token LIKE '%s'" % token)
+        out_put = {
+            "message": "!",
+            "code": 1
+        }
+        if my_db is None:
+            out_put["message"] = "Incorrect Token"
+            out_put["code"] = MyCodes.Wrong_token
+        else:
+            username = my_db["username"]
+            choosenTicket=self.db.get("SELECT * FROM tickets WHERE ID LIKE "+str(id))
+            if choosenTicket["username"] != username:
+                out_put["message"] = "Access Denied"
+                out_put["code"] = MyCodes.Access_Denied
+            else:
+                self.db.execute("UPDATE tickets SET Status="+str(ticket.Ticket.Close) +
+                                " WHERE ID LIKE "+str(id))
+
+                out_put["message"] = "Ticket With id -"+str(id)+"- Closed Successfully"
+                out_put["code"] = MyCodes.OK
+        out_put_json = json.dumps(out_put)
+        self.write(out_put_json)
 
 
 class GetTicketmod(BaseHandler):
     def get(self):
-        pass
+        token = self.get_argument("token")
+        my_db = self.db.get("SELECT * FROM users WHERE token LIKE '%s'" % token)
+        if my_db is None:
+            out_put = {}
+            out_put["message"] = "Incorrect Token"
+            out_put["code"] = MyCodes.Wrong_token
+            self.write(json.dumps(out_put))
+        else:
+            username = my_db["username"]
+            if my_db["role"]!="A":
+                out_put = {}
+                out_put["message"] = "Access Denied you are not admin!"
+                out_put["code"] = MyCodes.Access_Denied
+                self.write(json.dumps(out_put))
+            else:
+                listOfTickets=ticket.Ticket.getAll_admin(self.db)
+                self.write(listOfTickets)
 
 
 class ResToTicketmod(BaseHandler):
     def get(self):
-        pass
+        token = self.get_argument("token")
+        id = str(self.get_argument("id"))
+        body = self.get_argument("body")
+        my_db = self.db.get("SELECT * FROM users WHERE token LIKE '%s'" % token)
+
+        out_put = {
+            "message": "!",
+            "code": 1
+        }
+        if my_db is None:
+            out_put["message"] = "Incorrect Token"
+            out_put["code"] = MyCodes.Wrong_token
+        elif my_db["role"]!="A":
+            out_put["message"] = "Access Denied you are not admin!"
+            out_put["code"] = MyCodes.Access_Denied
+        else:
+            self.db.execute("UPDATE tickets SET Status="+ str(ticket.Ticket.Close)
+                            +",response='"+body+"' WHERE ID LIKE " +id)
+            out_put["message"] = "Response to Ticket With id -"+str(id)+"- Sent Successfully"
+            out_put["code"] = MyCodes.OK
+        self.write(json.dumps(out_put))
 
 
 class ChangeStatus(BaseHandler):
@@ -192,19 +244,16 @@ class Signup(BaseHandler):
 
         out_put ={
             "message" : "!",
-            "code":1,
-            "result":json.dumps({})
+            "code":1
         }
         if my_db is not None:
             out_put["message"]="The user seems to exist!"
             out_put["code"] = MyCodes.duplicate
-            out_put["result"]=my_db
         else:
             self.db.execute("INSERT INTO users(username,password,role,token,firstname,lastname) "
                             "VALUES(%s,%s,%s,%s,%s,%s)",user_name,password,'U','0',firstname,lastname)
             out_put["message"] = "Signed Up Successfully"
             out_put["code"] = MyCodes.OK
-            out_put["result"] = my_db
         out_put_json = json.dumps(out_put)
         self.write(out_put_json)
 
@@ -218,20 +267,17 @@ class Login(BaseHandler):
         out_put ={
             "message" : "!",
             "code":1,
-            "result":json.dumps({}),
             "token":0
         }
         if my_db is None:
             out_put["message"]="The user dosen't seem to exist!"
             out_put["code"]=MyCodes.OK
-            out_put["result"]=json.dumps({})
             out_put["token"]="0"
         else:
             my_choosed_db=self.db.get("SELECT * FROM users WHERE username LIKE %s AND password LIKE %s",user_name,password)
             if my_choosed_db is None:
                 out_put["message"] = "Wrong password"
                 out_put["code"] = MyCodes.Wrong_pass
-                out_put["result"] = json.dumps({})
                 out_put["token"] = "0"
             else:
                 if my_choosed_db["token"]==0 or my_choosed_db["token"]=="0":
@@ -245,12 +291,10 @@ class Login(BaseHandler):
                     self.db.execute("UPDATE users SET token=%s WHERE username LIKE %s",rand_token,user_name)
                     out_put["message"] = "Logged in Successfully"
                     out_put["code"] = MyCodes.OK
-                    out_put["result"] = my_choosed_db
                     out_put["token"] = rand_token
                 else:
                     out_put["message"] = "Already Logged in"
                     out_put["code"] = MyCodes.Already_done
-                    out_put["result"] = my_choosed_db
 
                     out_put["token"] = str(my_choosed_db["token"])
         out_put_json=json.dumps(out_put)

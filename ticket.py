@@ -8,8 +8,7 @@ class Ticket:
     Close = 2
 
     @staticmethod
-    def getAll(db,username):
-        my_db=db.query("SELECT subject,body,Status,id,date FROM tickets WHERE username LIKE %s ORDER BY ID",username)
+    def __getAll(my_db):
         size="There Are -"+str(len(my_db))+"- Ticket"
         my_dic = {
             "tickets": size,
@@ -23,6 +22,23 @@ class Ticket:
             myjs=json.dumps(my_dic)
         return (myjs)
         #ouf=json.dumps(my_dic,)
+
+    @staticmethod
+    def __getAuth(db,username,dominant=False):
+        if not dominant:
+            return db.query("SELECT subject,body,Status,id,date FROM tickets WHERE username LIKE %s ORDER BY ID", username)
+        else:
+            return db.query("SELECT subject,body,Status,id,date FROM tickets ORDER BY ID")
+
+    @staticmethod
+    def getAll_admin(db):
+        my_db =Ticket.__getAuth(db,"z",True)
+        return Ticket.__getAll(my_db)
+
+    @staticmethod
+    def getAll_user(db,username):
+        my_db = Ticket.__getAuth(db, username)
+        return Ticket.__getAll(my_db)
 
     def __init__(self):
         body = ""
