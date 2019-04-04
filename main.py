@@ -1,8 +1,11 @@
 import torndb
-import random
+import os
+#import random
 import tornado.escape
 import tornado.httpserver
 import tornado.ioloop
+from binascii import hexlify
+
 import tornado.options
 import tornado.web
 import json
@@ -13,6 +16,19 @@ define("mysql_host", default="127.0.0.1:3306", help="database host")
 define("mysql_database", default="ali_db", help="database name")
 define("mysql_user", default="ali", help="database user")
 define("mysql_password", default="p", help="database password")
+
+
+class MyCodes:
+
+    def __init__(self):
+        pass
+    NotFound=404
+    OK=200
+    duplicate=303
+    Ok_but_done_before=201
+    Already_done=202
+    Wrong_pass = 100
+    Wrong_user_pass = 105
 
 
 class Application(tornado.web.Application):
@@ -50,7 +66,7 @@ class Logout(BaseHandler):
         user_name = self.get_argument("username")
         password = self.get_argument("password")
         my_db = self.db.get(
-            "SELECT * FROM users WHERE username LIKE '" + user_name + "' AND password LIKE '" + password + "'")
+            "SELECT * FROM users WHERE username LIKE %s AND password LIKE %s",user_name,password)
         # out_put=json.dumps({})
         out_put = {
             "message": "!",
@@ -59,19 +75,18 @@ class Logout(BaseHandler):
         }
         if my_db is None:
             out_put["message"] = "Username or Password is wrong"
-            out_put["code"] = 404
+            out_put["code"] = MyCodes.NotFound
             out_put["result"] = json.dumps({})
         else:
             out_put["result"] = my_db
-            if my_db["token"]=="0" or my_db["token"]==0:
+            if my_db["token"] == "0" or my_db["token"]==0:
                 out_put["message"] = "Already logged out"
-                out_put["code"] = "201"
+                out_put["code"] = MyCodes.Already_done
             else:
-                my_db_str="UPDATE users SET token=" + str(0) + " WHERE username LIKE '" + user_name + "'"
-                print(my_db_str)
-                self.db.execute(my_db_str)
+
+                self.db.execute("UPDATE users SET token='0' WHERE username LIKE %s", user_name )
                 out_put["message"] = "Logged Out Successfully"
-                out_put["code"] = "200"
+                out_put["code"] = MyCodes.OK
                 out_put["result"] = my_db
 
         out_put_json = json.dumps(out_put)
@@ -80,7 +95,30 @@ class Logout(BaseHandler):
 
 class SendTicket(BaseHandler):
     def get(self):
-        pass
+        token = self.get_argument("token")
+        subj = self.get_argument("subject")
+        body_mes = self.get_argument("body")
+
+
+        my_db = self.db.get("SELECT * FROM users WHERE username LIKE '%s'" % user_name)
+
+        out_put = {
+            "message": "!",
+            "code": 1,
+            "result": json.dumps({})
+        }
+        if my_db is not None:
+            out_put["message"] = "The user seems to exist!"
+            out_put["code"] = 303
+            out_put["result"] = my_db
+        else:
+            self.db.execute(
+                "INSERT INTO users(username,password,role,token,firstname,lastname) VALUES('" + user_name + "','" + password + "','U',0,'" + firstname + "','" + lastname + "')")
+            out_put["message"] = "Signed Up Successfully"
+            out_put["code"] = "200"
+            out_put["result"] = my_db
+        out_put_json = json.dumps(out_put)
+        self.write(out_put_json)
 
 
 class GetTicketcli(BaseHandler):
@@ -130,17 +168,16 @@ class Signup(BaseHandler):
         }
         if my_db is not None:
             out_put["message"]="The user seems to exist!"
-            out_put["code"] = 303
+            out_put["code"] = MyCodes.duplicate
             out_put["result"]=my_db
         else:
-            self.db.execute("INSERT INTO users(username,password,role,token,firstname,lastname) VALUES('"+user_name+"','"+password+"','U',0,'"+firstname+"','"+lastname+"')")
+            self.db.execute("INSERT INTO users(username,password,role,token,firstname,lastname) "
+                            "VALUES(%s,%s,%s,%s,%s)",user_name,password,'U','0',firstname,lastname)
             out_put["message"] = "Signed Up Successfully"
-            out_put["code"] = "200"
+            out_put["code"] = MyCodes.OK
             out_put["result"] = my_db
-        out_put_json=json.dumps(out_put)
+        out_put_json = json.dumps(out_put)
         self.write(out_put_json)
-
-
 
 
 class Login(BaseHandler):
@@ -157,32 +194,33 @@ class Login(BaseHandler):
         }
         if my_db is None:
             out_put["message"]="The user dosen't seem to exist!"
-            out_put["code"]=404
+            out_put["code"]=MyCodes.OK
             out_put["result"]=json.dumps({})
-            out_put["token"]=0
+            out_put["token"]="0"
         else:
-            my_choosed_db=self.db.get("SELECT * FROM users WHERE username LIKE '" +user_name + "' AND password LIKE '"+ password +"'")
+            my_choosed_db=self.db.get("SELECT * FROM users WHERE username LIKE %s AND password LIKE %s",user_name,password)
             if my_choosed_db is None:
-                out_put["message"] = "Worng password"
-                out_put["code"] = "100"
+                out_put["message"] = "Wrong password"
+                out_put["code"] = MyCodes.Wrong_pass
                 out_put["result"] = json.dumps({})
                 out_put["token"] = "0"
             else:
                 if my_choosed_db["token"]==0 or my_choosed_db["token"]=="0":
                     go_on=True
                     while go_on:
-                        rand_num=random.randint(1e6,1e9)
-                        search_db=self.db.get("SELECT token FROM users WHERE token LIKE " + str(rand_num))
+                        rand_token = str(hexlify(os.urandom(16)))
+                        #rand_num=random.randint(1e6,1e9)
+                        search_db=self.db.get("SELECT token FROM users WHERE token LIKE %s", rand_token)
                         if search_db is None:
                             go_on=False
-                    self.db.execute("UPDATE users SET token="+str(rand_num)+" WHERE username LIKE '"+user_name+"'")
+                    self.db.execute("UPDATE users SET token=%s WHERE username LIKE %s",rand_token,user_name)
                     out_put["message"] = "Logged in Successfully"
-                    out_put["code"] = "200"
+                    out_put["code"] = MyCodes.OK
                     out_put["result"] = my_choosed_db
-                    out_put["token"] = str(rand_num)
+                    out_put["token"] = rand_token
                 else:
                     out_put["message"] = "Already Logged in"
-                    out_put["code"] = "303"
+                    out_put["code"] = MyCodes.Already_done
                     out_put["result"] = my_choosed_db
 
                     out_put["token"] = str(my_choosed_db["token"])
