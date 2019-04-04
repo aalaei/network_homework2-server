@@ -30,6 +30,7 @@ class MyCodes:
     Already_done=202
     Wrong_pass = 100
     Wrong_user_pass = 105
+    Wrong_token =106
 
 
 class Application(tornado.web.Application):
@@ -45,6 +46,7 @@ class Application(tornado.web.Application):
             (r"/restoticketmod", ResToTicketmod),
             (r"/changestatus", ChangeStatus),
             (r"/show",ShowUsers),
+            (r"/showT", ShowTickets),
             (r".*", DefaultHandler),
         ]
         settings = dict()
@@ -69,6 +71,12 @@ class ShowUsers(BaseHandler):
         self.write(json.dumps(my_db))
 
 
+class ShowTickets(BaseHandler):
+    def get(self):
+        my_db = self.db.query("SELECT * FROM tickets")
+        self.write(json.dumps(my_db))
+
+
 class Logout(BaseHandler):
     def get(self):
         user_name = self.get_argument("username")
@@ -83,7 +91,7 @@ class Logout(BaseHandler):
         }
         if my_db is None:
             out_put["message"] = "Username or Password is wrong"
-            out_put["code"] = MyCodes.NotFound
+            out_put["code"] = MyCodes.Wrong_user_pass
             out_put["result"] = json.dumps({})
         else:
             out_put["result"] = my_db
@@ -105,35 +113,47 @@ class SendTicket(BaseHandler):
     def get(self):
         token = self.get_argument("token")
         new_ticket=ticket.Ticket()
-        new_ticket.
-        subj = self.get_argument("subject")
-        body_mes = self.get_argument("body")
-
+        new_ticket.subject=self.get_argument("subject")
+        new_ticket.body=self.get_argument("body")
+        new_ticket.Status=ticket.Ticket.Open
         my_db = self.db.get("SELECT * FROM users WHERE token LIKE '%s'" % token)
 
         out_put = {
             "message": "!",
             "code": 1,
-            "result": json.dumps({})
+            "result": json.dumps({}),
+            "id": 0
         }
-        if my_db is not None:
-            out_put["message"] = "The user seems to exist!"
-            out_put["code"] = 303
+        if my_db is None:
+            out_put["message"] = "Incorrect Token"
+            out_put["code"] = MyCodes.Wrong_token
             out_put["result"] = my_db
         else:
-            #self.db.execute(
-            #    "INSERT INTO users(username,password,role,token,firstname,lastname) VALUES('" + user_name + "','" + password + "','U',0,'" + firstname + "','" + lastname + "')")
-            out_put["message"] = "Signed Up Successfully"
-            out_put["code"] = "200"
+            username=my_db["username"]
+            id = new_ticket.add_to_db(self.db,username)
+            out_put["message"] = "Ticket Sent Successfully"
+            out_put["code"] = MyCodes.OK
             out_put["result"] = my_db
+            out_put["id"] = id
         out_put_json = json.dumps(out_put)
         self.write(out_put_json)
 
 
 class GetTicketcli(BaseHandler):
     def get(self):
-        pass
-
+        token = self.get_argument("token")
+        my_db = self.db.get("SELECT * FROM users WHERE token LIKE '%s'" % token)
+        if my_db is None:
+            out_put = {}
+            out_put["message"] = "Incorrect Token"
+            out_put["code"] = MyCodes.Wrong_token
+            out_put["result"] = my_db
+            out_put["id"] = 0
+            self.write(json.dumps(out_put))
+        else:
+            username = my_db["username"]
+            listOfTickets=ticket.Ticket.getAll(self.db,username)
+            self.write(listOfTickets)
 
 class CloseTicket(BaseHandler):
     def get(self):
