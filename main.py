@@ -37,6 +37,7 @@ class MyCodes:
 class Application(tornado.web.Application):
     def __init__(self):
         handlers = [
+            (r"/",Help),
             (r"/signup", Signup),
             (r"/login", Login),
             (r"/logout", Logout),
@@ -48,6 +49,7 @@ class Application(tornado.web.Application):
             (r"/changestatus", ChangeStatus),
             (r"/show",ShowUsers),
             (r"/showT", ShowTickets),
+            (r"/renumberate", ReNumberate),
             (r".*", DefaultHandler),
         ]
         settings = dict()
@@ -64,6 +66,11 @@ class BaseHandler(tornado.web.RequestHandler):
     @property
     def db(self):
         return self.application.db
+
+
+class Help(BaseHandler):
+    def get(self):
+        self.write("<title>Help!</title><body><center><h1>hello</h1></center></body>")
 
 
 class ShowUsers(BaseHandler):
@@ -248,6 +255,7 @@ class ChangeStatus(BaseHandler):
                 out_put["code"] = MyCodes.OK
         self.write(json.dumps(out_put))
 
+
 class Signup(BaseHandler):
     def get(self):
         user_name = self.get_argument("username")
@@ -325,6 +333,34 @@ class Login(BaseHandler):
 class DefaultHandler(BaseHandler):
     def get(self):
         self.write("opps!! syntax error!!")
+
+
+class ReNumberate(BaseHandler):
+    def get(self):
+        token = self.get_argument("token")
+        password = self.get_argument("password")
+        my_db = self.db.get("SELECT * FROM users WHERE token LIKE '%s'" % token)
+        out_put = {
+            "message": "!",
+            "code": 1
+        }
+        if my_db is None:
+            out_put["message"] = "Incorrect Token"
+            out_put["code"] = MyCodes.Wrong_token
+        elif my_db["role"] != "A":
+            out_put["message"] = "Access Denied you are not admin!"
+            out_put["code"] = MyCodes.Access_Denied
+        elif my_db["password"]!=password:
+            out_put["message"]="Entered password is incorrect"
+            out_put["code"] = MyCodes.Wrong_pass
+        else:
+            self.db.execute("truncate table users")
+            self.db.execute("truncate table tickets")
+            out_put = {
+                "message": "All done,every thing is erased!!",
+                "code": MyCodes.OK
+        }
+        self.write(json.dumps(out_put))
 
 
 def main():
