@@ -1,4 +1,5 @@
 import torndb
+import ticket
 import os
 #import random
 import tornado.escape
@@ -43,6 +44,7 @@ class Application(tornado.web.Application):
             (r"/getticketmod", GetTicketmod),
             (r"/restoticketmod", ResToTicketmod),
             (r"/changestatus", ChangeStatus),
+            (r"/show",ShowUsers),
             (r".*", DefaultHandler),
         ]
         settings = dict()
@@ -59,6 +61,12 @@ class BaseHandler(tornado.web.RequestHandler):
     @property
     def db(self):
         return self.application.db
+
+
+class ShowUsers(BaseHandler):
+    def get(self):
+        my_db = self.db.query("SELECT * FROM users")
+        self.write(json.dumps(my_db))
 
 
 class Logout(BaseHandler):
@@ -96,11 +104,12 @@ class Logout(BaseHandler):
 class SendTicket(BaseHandler):
     def get(self):
         token = self.get_argument("token")
+        new_ticket=ticket.Ticket()
+        new_ticket.
         subj = self.get_argument("subject")
         body_mes = self.get_argument("body")
 
-
-        my_db = self.db.get("SELECT * FROM users WHERE username LIKE '%s'" % user_name)
+        my_db = self.db.get("SELECT * FROM users WHERE token LIKE '%s'" % token)
 
         out_put = {
             "message": "!",
@@ -112,8 +121,8 @@ class SendTicket(BaseHandler):
             out_put["code"] = 303
             out_put["result"] = my_db
         else:
-            self.db.execute(
-                "INSERT INTO users(username,password,role,token,firstname,lastname) VALUES('" + user_name + "','" + password + "','U',0,'" + firstname + "','" + lastname + "')")
+            #self.db.execute(
+            #    "INSERT INTO users(username,password,role,token,firstname,lastname) VALUES('" + user_name + "','" + password + "','U',0,'" + firstname + "','" + lastname + "')")
             out_put["message"] = "Signed Up Successfully"
             out_put["code"] = "200"
             out_put["result"] = my_db
@@ -172,7 +181,7 @@ class Signup(BaseHandler):
             out_put["result"]=my_db
         else:
             self.db.execute("INSERT INTO users(username,password,role,token,firstname,lastname) "
-                            "VALUES(%s,%s,%s,%s,%s)",user_name,password,'U','0',firstname,lastname)
+                            "VALUES(%s,%s,%s,%s,%s,%s)",user_name,password,'U','0',firstname,lastname)
             out_put["message"] = "Signed Up Successfully"
             out_put["code"] = MyCodes.OK
             out_put["result"] = my_db
