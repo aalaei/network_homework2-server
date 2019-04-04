@@ -4,7 +4,7 @@ import json
 class Ticket:
 
     Open = 0
-    Under_review = 1
+    In_progress = 1
     Close = 2
 
     @staticmethod
@@ -52,3 +52,13 @@ class Ticket:
         db.execute(mystr)
         my_choosen=db.get("SELECT ID FROM tickets ORDER BY ID DESC LIMIT 1")
         return my_choosen["ID"]
+
+    @staticmethod
+    def parse_status(input):
+        if input == "in progress":
+            res = Ticket.In_progress
+        elif input == "close":
+            res= Ticket.Close
+        else:
+            res=Ticket.Open
+        return  res

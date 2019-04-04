@@ -186,7 +186,7 @@ class GetTicketmod(BaseHandler):
             out_put["code"] = MyCodes.Wrong_token
             self.write(json.dumps(out_put))
         else:
-            username = my_db["username"]
+            #username = my_db["username"]
             if my_db["role"]!="A":
                 out_put = {}
                 out_put["message"] = "Access Denied you are not admin!"
@@ -224,8 +224,29 @@ class ResToTicketmod(BaseHandler):
 
 class ChangeStatus(BaseHandler):
     def get(self):
-        pass
+        token = self.get_argument("token")
+        id = self.get_argument("id")
+        status = self.get_argument("status")
+        status=ticket.Ticket.parse_status(status)
+        my_db = self.db.get("SELECT * FROM users WHERE token LIKE '%s'" % token)
+        out_put = {
+            "message": "!",
+            "code": 1
+        }
+        if my_db is None:
+            out_put["message"] = "Incorrect Token"
+            out_put["code"] = MyCodes.Wrong_token
 
+        else:
+            if my_db["role"] != "A":
+                out_put["message"] = "Access Denied you are not admin!"
+                out_put["code"] = MyCodes.Access_Denied
+            else:
+                self.db.execute("UPDATE tickets SET Status=" + str(status)
+                                + " WHERE ID LIKE " + id)
+                out_put["message"] = "Status Ticket With id -"+str(id)+"- Changed Successfully"
+                out_put["code"] = MyCodes.OK
+        self.write(json.dumps(out_put))
 
 class Signup(BaseHandler):
     def get(self):
