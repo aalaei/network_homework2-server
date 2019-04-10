@@ -10,6 +10,8 @@ class Ticket:
     @staticmethod
     def __getAll(my_db):
         size="There Are -"+str(len(my_db))+"- Ticket"
+        if my_db>1:
+            size=size+"s"
         my_dic = {
             "tickets": size,
             "code": 200,
@@ -19,7 +21,7 @@ class Ticket:
             my_dic['block ' + str(i)]= my_db[i]
             #my_dic.update({'block ' + str(i) : my_db[i]})
             i = i+1
-            myjs=json.dumps(my_dic)
+        myjs=json.dumps(my_dic)
         return (myjs)
         #ouf=json.dumps(my_dic,)
 

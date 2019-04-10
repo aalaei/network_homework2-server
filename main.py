@@ -78,18 +78,23 @@ class Help(BaseHandler):
     def get(self):
         # self.write("سلام".decode("utf-8"))
         # self.write("<title>hello!</title><body><center><h1>hello</h1><table border=\"1\"><tr><td>row1,cel1<td><td>row1,cel2<td><tr><tr><td>row1,cel1<td><td>row1,cel1<td></tr></table></center></body>")
-        f = codecs.open("/home/ali/PycharmProjects/project/index.html", "r", 'utf-8')
+        # f = codecs.open("/home/ali/PycharmProjects/project/index.html", "r", 'utf-8')
         # f=open("/home/ali/PycharmProjects/project/index.html", "r")
-        # self.render("/home/ali/PycharmProjects/project/" + "index.html",aString="utf-8",)
-        # f.encoding="utf-8"
-        a = f.read()
-        self.write(a)
+        self.render("/home/ali/PycharmProjects/project/" + "index.html", aString="utf-8", )
+    # f.encoding="utf-8"
+    # a = f.read()
+    # self.write(a)
 
 
 class ShowUsers(BaseHandler):
     def get(self):
-        my_db = self.db.query("SELECT * FROM users")
-        self.write(json.dumps(my_db))
+        my_db = self.db.query("SELECT username,firstname,lastname,role,ID FROM users")
+        max = list(my_db).__len__()
+        out = {
+            "num": max,
+            "users": my_db
+        }
+        self.write(json.dumps(out))
 
 
 class ShowTickets(BaseHandler):
@@ -199,8 +204,9 @@ class CloseTicket(BaseHandler):
             out_put["code"] = MyCodes.Wrong_token
         else:
             username = my_db["username"]
+            role = my_db["role"]
             choosenTicket = self.db.get("SELECT * FROM tickets WHERE ID LIKE " + str(id))
-            if choosenTicket["username"] != username:
+            if (choosenTicket["username"] != username) and role != "A":
                 out_put["message"] = "Access Denied"
                 out_put["code"] = MyCodes.Access_Denied
             else:
@@ -430,7 +436,7 @@ class ChangeRole(BaseHandler):
             else:
                 self.db.execute("UPDATE users SET role='" + role
                                 + "' WHERE username LIKE '" + username + "'")
-                out_put["message"] = "Role of user +" + username + "is now" + role
+                out_put["message"] = "Role of user -" + username + "- is now: " + role
                 out_put["code"] = MyCodes.OK
         self.write(json.dumps(out_put))
 
@@ -466,8 +472,8 @@ class ReNumberate(BaseHandler):
         else:
             self.db.execute("truncate table users")
             self.db.execute("truncate table tickets")
-            self.db.execute("INSERT INTO users('ali','pass','A','0','ali','alaei') "
-                            "VALUES(%s,%s,%s,%s,%s,%s)")  # for having at least one admin!
+            self.db.execute("INSERT INTO users(username,password,role,token,firstname,lastname) "
+                            "VALUES('ali','pass','A','0','ali','alaei')")  # for having at least one admin!
             out_put = {
                 "message": "All done,every thing is erased!!",
                 "code": MyCodes.OK
