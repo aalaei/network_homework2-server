@@ -10,6 +10,7 @@ import tornado.options
 import tornado.web
 from binascii import hexlify
 from tornado.options import define, options
+import csv
 
 import torndb
 
@@ -27,6 +28,7 @@ class MyCodes:
     def __init__(self):
         pass
 
+    NotAllowed = 600
     NotFound = 404
     OK = 200
     duplicate = 303
@@ -76,11 +78,17 @@ class BaseHandler(tornado.web.RequestHandler):
 
 class Help(BaseHandler):
     def get(self):
-        # self.write("سلام".decode("utf-8"))
+        f = codecs.open("/home/ali/PycharmProjects/project/methods.html", "r","utf-8")
+
+
+        #text = "سلام"
+        text=f.read()
+        #self.write(text.decode("utf-8"))
+        self.write(text)
         # self.write("<title>hello!</title><body><center><h1>hello</h1><table border=\"1\"><tr><td>row1,cel1<td><td>row1,cel2<td><tr><tr><td>row1,cel1<td><td>row1,cel1<td></tr></table></center></body>")
         # f = codecs.open("/home/ali/PycharmProjects/project/index.html", "r", 'utf-8')
         # f=open("/home/ali/PycharmProjects/project/index.html", "r")
-        self.render("/home/ali/PycharmProjects/project/" + "index.html", aString="utf-8", )
+        # self.render("/home/ali/PycharmProjects/project/" + "index2.html", aString="utf-8", )
     # f.encoding="utf-8"
     # a = f.read()
     # self.write(a)
@@ -433,6 +441,9 @@ class ChangeRole(BaseHandler):
             if my_db["role"] != "A":
                 out_put["message"] = "Access Denied you are not admin!"
                 out_put["code"] = MyCodes.Access_Denied
+            elif username == "ali":
+                out_put["message"] = "master user's role can not be changed!!"
+                out_put["code"] = MyCodes.NotAllowed
             else:
                 self.db.execute("UPDATE users SET role='" + role
                                 + "' WHERE username LIKE '" + username + "'")
@@ -475,7 +486,7 @@ class ReNumberate(BaseHandler):
             self.db.execute("INSERT INTO users(username,password,role,token,firstname,lastname) "
                             "VALUES('ali','pass','A','0','ali','alaei')")  # for having at least one admin!
             out_put = {
-                "message": "All done,every thing is erased!!",
+                "message": "All done,every thing is erased exept for user ali!!",
                 "code": MyCodes.OK
             }
         self.write(json.dumps(out_put))
