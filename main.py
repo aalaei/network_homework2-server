@@ -108,7 +108,12 @@ class ShowUsers(BaseHandler):
 class ShowTickets(BaseHandler):
     def get(self):
         my_db = self.db.query("SELECT * FROM tickets")
-        self.write(json.dumps(my_db))
+        max = list(my_db).__len__()
+        out = {
+            "num": max,
+            "tickets": my_db
+        }
+        self.write(json.dumps(out))
 
 
 class Logout(BaseHandler):
